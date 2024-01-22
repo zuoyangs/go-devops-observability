@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zuoyangs/go-jenkins-api/internal/jenkins_api"
+	"github.com/zuoyangs/go-devops-observability/internal/jenkins_api"
 )
 
 // 获取 Jenkins 中的 jobs 信息

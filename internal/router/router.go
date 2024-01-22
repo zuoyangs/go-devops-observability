@@ -11,8 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
-	"github.com/zuoyangs/go-jenkins-api/internal/jenkins_api"
-	"github.com/zuoyangs/go-jenkins-api/internal/jenkins_api/impl"
+	"github.com/zuoyangs/go-devops-observability/internal/jenkins_api"
+	"github.com/zuoyangs/go-devops-observability/internal/jenkins_api/impl"
 )
 
 type ResponseData struct {
@@ -190,11 +190,14 @@ func getMetricsHandler(c *gin.Context) {
 
 	// 计算成功率和失败率，并将结果转换为新的结构体输出
 	stats := make([]JenkinsJobStatsExtended, 0)
+
 	for jenkinsInstanceName, jobs := range resultMap {
+
 		for jobName, data := range jobs {
 			successCount := data.SuccessCount
 			failureCount := data.FailureCount
 			totalCount := successCount + failureCount
+
 			successRate := 0.0
 			failureRate := 0.0
 			if totalCount > 0 {
@@ -212,6 +215,20 @@ func getMetricsHandler(c *gin.Context) {
 				TotalCount:          totalCount,
 			})
 		}
+
+	}
+
+	//如果stat是空的，则添置默认值
+	if len(stats) == 0 {
+		stats = append(stats, JenkinsJobStatsExtended{
+			JenkinsInstanceName: "无",
+			JobName:             "无",
+			SuccessCount:        0,
+			FailureCount:        0,
+			SuccessRate:         0.0,
+			FailureRate:         0.0,
+			TotalCount:          0,
+		})
 	}
 	log.Printf("stats:%v", stats)
 	c.JSON(http.StatusOK, gin.H{"持续集成发布稳定性指标": stats})

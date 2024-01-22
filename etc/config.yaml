@@ -1,4 +1,4 @@
 ﻿Jenkins1:
-    jenkinsURL: "http://10.0.0.1:8080"
+    jenkinsURL: "http://10.0.15.6:8080"
     username: "admin"
-    password: "admin"
+    password: "Jack1q2w3e"
