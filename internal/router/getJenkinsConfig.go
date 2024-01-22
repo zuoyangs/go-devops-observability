@@ -3,7 +3,7 @@
 import (
 	"errors"
 
-	"github.com/zuoyangs/go-jenkins-api/internal/jenkins_api"
+	"github.com/zuoyangs/go-devops-observability/internal/jenkins_api"
 )
 
 func GetJenkinsConfig(jenkinsConfig interface{}) (*jenkins_api.JenkinsJobsRequest, error) {

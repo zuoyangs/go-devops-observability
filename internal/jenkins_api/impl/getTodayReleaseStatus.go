@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zuoyangs/go-jenkins-api/internal/jenkins_api"
+	"github.com/zuoyangs/go-devops-observability/internal/jenkins_api"
 )
 
 func (j *JenkinsServiceImpl) GetTodayReleaseStatus(c context.Context, config *jenkins_api.JenkinsTodayReleaseStatusRequest) (string, error) {

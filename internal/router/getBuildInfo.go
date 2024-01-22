@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/zuoyangs/go-jenkins-api/internal/jenkins_api"
+	"github.com/zuoyangs/go-devops-observability/internal/jenkins_api"
 )
 
 type JenkinsJobsResponse struct {

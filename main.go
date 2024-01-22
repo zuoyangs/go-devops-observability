@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
-	"github.com/zuoyangs/go-jenkins-api/internal/router"
+	"github.com/zuoyangs/go-devops-observability/internal/router"
 )
 
 func main() {
