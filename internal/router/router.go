@@ -31,13 +31,22 @@ type ResponseData struct {
 }
 
 type JenkinsJobStatsExtended struct {
-	JenkinsInstanceName string  `json:"jenkinsInstanceName"`
-	JobName             string  `json:"jobName"`
-	SuccessCount        int     `json:"successCount"`
-	FailureCount        int     `json:"failureCount"`
-	TotalCount          int     `json:"totalCount"`
-	SuccessRate         float64 `json:"successRate"`
-	FailureRate         float64 `json:"failureRate"`
+	JenkinsInstanceName string `json:"jenkinsInstanceName"`
+	JobName             string `json:"jobName"`
+
+	// 当天的统计信息
+	TodaySuccessCount int     `json:"todaySuccessCount"`
+	TodayFailureCount int     `json:"todayFailureCount"`
+	TodayTotalCount   int     `json:"todayTotalCount"`
+	TodaySuccessRate  float64 `json:"todaySuccessRate"`
+	TodayFailureRate  float64 `json:"todayFailureRate"`
+
+	// 当前月份的统计信息
+	CurrentMonthSuccessCount int     `json:"currentMonthSuccessCount"`
+	CurrentMonthFailureCount int     `json:"currentMonthFailureCount"`
+	CurrentMonthTotalCount   int     `json:"currentMonthTotalCount"`
+	CurrentMonthSuccessRate  float64 `json:"currentMonthSuccessRate"`
+	CurrentMonthFailureRate  float64 `json:"currentMonthFailureRate"`
 }
 
 func SetupAPIRouters(r *gin.Engine) {
@@ -139,13 +148,17 @@ func getMetricsHandler(c *gin.Context) {
 	todayStart := time.Now().Truncate(24 * time.Hour)
 	todayMillis := todayStart.UnixNano() / int64(time.Millisecond)
 
-	resultMap := make(map[string]map[string]*ResponseData)
+	// 计算当前月份的第一天
+	firstDayOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	firstDayOfMonthMillis := firstDayOfMonth.UnixNano() / int64(time.Millisecond)
+
+	resultMap := make(map[string]map[string]*JenkinsJobStatsExtended)
 
 	// 遍历构建数据并计算成功和失败次数
 	for _, buildItem := range responseData {
 
 		if buildItem == nil {
-			log.Printf("buildItem is null,可能未发布过")
+			log.Printf("构建项 (buildItem) 为空, 可能尚未发布过任何内容。")
 			continue
 		}
 
@@ -153,31 +166,72 @@ func getMetricsHandler(c *gin.Context) {
 		if build, ok := buildItem.([]JenkinsBuildsResponse); ok {
 			for _, items := range build {
 				for _, item := range items.Jobs {
+
+					//计算当日的发布次数
 					if item.Timestamp >= todayMillis && item.Timestamp <= millis {
 						if _, ok := resultMap[item.JenkinsInstanceName]; !ok {
-							resultMap[item.JenkinsInstanceName] = make(map[string]*ResponseData)
+							resultMap[item.JenkinsInstanceName] = make(map[string]*JenkinsJobStatsExtended)
 						}
 						if _, ok := resultMap[item.JenkinsInstanceName][item.JobName]; !ok {
-							resultMap[item.JenkinsInstanceName][item.JobName] = &ResponseData{
+							resultMap[item.JenkinsInstanceName][item.JobName] = &JenkinsJobStatsExtended{
 								JenkinsInstanceName: item.JenkinsInstanceName,
 								JobName:             item.JobName,
-								JobURL:              item.JobURL,
-								SuccessCount:        0,
-								FailureCount:        0,
+								TodaySuccessCount:   0,
+								TodayFailureCount:   0,
+								TodaySuccessRate:    0.0,
+								TodayFailureRate:    0.0,
+								TodayTotalCount:     0,
 							}
 						}
 						//更新成功或失败次数
 						switch item.Result {
 						case "SUCCESS":
-							resultMap[item.JenkinsInstanceName][item.JobName].SuccessCount++
-							log.Printf("SUCCESS:%v", resultMap[item.JenkinsInstanceName][item.JobName])
+							resultMap[item.JenkinsInstanceName][item.JobName].TodaySuccessCount++
 						case "FAILURE":
-							resultMap[item.JenkinsInstanceName][item.JobName].FailureCount++
-							log.Printf("FAILURE:%v", resultMap[item.JenkinsInstanceName][item.JobName])
-
+							resultMap[item.JenkinsInstanceName][item.JobName].TodayFailureCount++
 						default:
 							// 处理未知Result，例如记录日志或增加错误计数
 							log.Printf("Unknown result for job %s in instance %s: %s", item.JobName, item.JenkinsInstanceName, item.Result)
+						}
+						resultMap[item.JenkinsInstanceName][item.JobName].TodayTotalCount = resultMap[item.JenkinsInstanceName][item.JobName].TodaySuccessCount + resultMap[item.JenkinsInstanceName][item.JobName].TodayFailureCount
+
+						if resultMap[item.JenkinsInstanceName][item.JobName].TodayTotalCount > 0 {
+							resultMap[item.JenkinsInstanceName][item.JobName].TodaySuccessRate = math.Round(float64(resultMap[item.JenkinsInstanceName][item.JobName].TodaySuccessCount)/float64(resultMap[item.JenkinsInstanceName][item.JobName].TodayTotalCount)*100.0*1e2) / 1e2
+							resultMap[item.JenkinsInstanceName][item.JobName].TodayFailureRate = math.Round(float64(resultMap[item.JenkinsInstanceName][item.JobName].TodayFailureCount)/float64(resultMap[item.JenkinsInstanceName][item.JobName].TodayTotalCount)*100.0*1e2) / 1e2
+						}
+					}
+
+					//计算当前月的发布次数
+					if item.Timestamp >= firstDayOfMonthMillis && item.Timestamp <= millis {
+						if _, ok := resultMap[item.JenkinsInstanceName]; !ok {
+							resultMap[item.JenkinsInstanceName] = make(map[string]*JenkinsJobStatsExtended)
+						}
+						if _, ok := resultMap[item.JenkinsInstanceName][item.JobName]; !ok {
+							resultMap[item.JenkinsInstanceName][item.JobName] = &JenkinsJobStatsExtended{
+								JenkinsInstanceName:      item.JenkinsInstanceName,
+								JobName:                  item.JobName,
+								CurrentMonthSuccessCount: 0,
+								CurrentMonthFailureCount: 0,
+								CurrentMonthTotalCount:   0,
+								CurrentMonthSuccessRate:  0.0,
+								CurrentMonthFailureRate:  0.0,
+							}
+						}
+						//更新成功或失败次数
+						switch item.Result {
+						case "SUCCESS":
+							resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthSuccessCount++
+						case "FAILURE":
+							resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthFailureCount++
+						default:
+							// 处理未知Result，例如记录日志或增加错误计数
+							log.Printf("Unknown result for job %s in instance %s: %s", item.JobName, item.JenkinsInstanceName, item.Result)
+						}
+						resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthTotalCount = resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthSuccessCount + resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthFailureCount
+
+						if resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthTotalCount > 0 {
+							resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthSuccessRate = math.Round(float64(resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthSuccessCount)/float64(resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthTotalCount)*100.0*1e2) / 1e2
+							resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthFailureRate = math.Round(float64(resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthFailureCount)/float64(resultMap[item.JenkinsInstanceName][item.JobName].CurrentMonthTotalCount)*100.0*1e2) / 1e2
 						}
 					}
 				}
@@ -188,49 +242,6 @@ func getMetricsHandler(c *gin.Context) {
 		}
 	}
 
-	// 计算成功率和失败率，并将结果转换为新的结构体输出
-	stats := make([]JenkinsJobStatsExtended, 0)
-
-	for jenkinsInstanceName, jobs := range resultMap {
-
-		for jobName, data := range jobs {
-			successCount := data.SuccessCount
-			failureCount := data.FailureCount
-			totalCount := successCount + failureCount
-
-			successRate := 0.0
-			failureRate := 0.0
-			if totalCount > 0 {
-				successRate = math.Round(float64(successCount)/float64(totalCount)*100.0*1e2) / 1e2
-				failureRate = math.Round(float64(failureCount)/float64(totalCount)*100.0*1e2) / 1e2
-			}
-
-			stats = append(stats, JenkinsJobStatsExtended{
-				JenkinsInstanceName: jenkinsInstanceName,
-				JobName:             jobName,
-				SuccessCount:        successCount,
-				FailureCount:        failureCount,
-				SuccessRate:         successRate,
-				FailureRate:         failureRate,
-				TotalCount:          totalCount,
-			})
-		}
-
-	}
-
-	//如果stat是空的，则添置默认值
-	if len(stats) == 0 {
-		stats = append(stats, JenkinsJobStatsExtended{
-			JenkinsInstanceName: "无",
-			JobName:             "无",
-			SuccessCount:        0,
-			FailureCount:        0,
-			SuccessRate:         0.0,
-			FailureRate:         0.0,
-			TotalCount:          0,
-		})
-	}
-	log.Printf("stats:%v", stats)
-	c.JSON(http.StatusOK, gin.H{"持续集成发布稳定性指标": stats})
-
+	log.Printf("stats:%v", resultMap)
+	c.JSON(http.StatusOK, gin.H{"持续集成发布稳定性指标": resultMap})
 }

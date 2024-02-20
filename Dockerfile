@@ -1,4 +1,4 @@
-FROM registry.cn-hangzhou.aliyuncs.com/mw5uk4snmsc/go:1.21.5-alpine3.19 as builder
+FROM registry.cn-hangzhou.aliyuncs.com/mw5uk4snmsc/go:1.21.6-alpine3.18 as builder
 
 ENV GO111MODULE=on \
     CGO_ENABLED=0 \
@@ -21,18 +21,18 @@ WORKDIR /opt
 
 COPY . .
 
-RUN go mod download && go mod tidy -v && go build -o go-jenkins-api .
+RUN go mod download && go mod tidy -v && go build -o go-devops-observability .
 
-FROM registry.cn-hangzhou.aliyuncs.com/mw5uk4snmsc/go:1.21.5-alpine3.19
+FROM registry.cn-hangzhou.aliyuncs.com/mw5uk4snmsc/go:1.21.6-alpine3.18
 
 WORKDIR /opt
 
 RUN set -ex \
    && mkdir -pv /opt/etc
 
-COPY --from=builder /opt/go-jenkins-api /opt/
+COPY --from=builder /opt/go-devops-observability /opt/
 COPY --from=builder /opt/etc /opt/etc
 
 EXPOSE 8080
 
-ENTRYPOINT ["./go-jenkins-api"]
+ENTRYPOINT ["./go-devops-observability"]
