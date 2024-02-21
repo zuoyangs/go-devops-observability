@@ -113,7 +113,7 @@ func getMetricsHandler(c *gin.Context) {
 					data := getBuildInfo(c, jenkinsInstanceName, job.Name, job.JobsURL, job, build, buildsHistoryMap, jobs_config.JenkinsBaseRequest.Username, jobs_config.JenkinsBaseRequest.Password)
 					buildData = append(buildData, data)
 				}
-				log.Printf("goroutine: jenkins实例: %v,  builds: %v", jenkinsInstanceName, buildData)
+				//log.Printf("goroutine: jenkins实例: %v,  builds: %v", jenkinsInstanceName, buildData)
 
 				// 将结果发送到channel
 				resultCh <- gin.H{"builds": buildData}
@@ -242,6 +242,15 @@ func getMetricsHandler(c *gin.Context) {
 		}
 	}
 
-	log.Printf("stats:%v", resultMap)
-	c.JSON(http.StatusOK, gin.H{"持续集成发布稳定性指标": resultMap})
+	//遍历 stats，将 jobName 下的层级append到切片字符串中
+	var stats []*JenkinsJobStatsExtended
+	for _, jobName := range resultMap {
+		log.Printf("jobName: %v\n", jobName)
+		for _, job := range jobName {
+			log.Printf("job: %v\n", job)
+			stats = append(stats, job)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"持续集成发布稳定性指标": stats})
 }
